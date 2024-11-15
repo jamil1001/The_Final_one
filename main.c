@@ -1,108 +1,129 @@
 /*******************************************************************************************
 *
-*   raylib [core] example - Basic 3d example
+*   RayLib 2D Challenge - An animated character
 *
-*   Welcome to raylib!
+*   @author Hans de Ruiter
 *
-*   To compile example, just press F5.
-*   Note that compiled executable is placed in the same folder as .c file
+*   @copyright (c) 2022 by Kea Sigma Delta Limited, all rights reserved
 *
-*   You can find all basic examples on C:\raylib\raylib\examples folder or
-*   raylib official webpage: www.raylib.com
-*
-*   Enjoy using raylib. :)
-*
-*   This example has been created using raylib 1.0 (www.raylib.com)
-*   raylib is licensed under an unmodified zlib/libpng license (View raylib.h for details)
-*
-*   Copyright (c) 2013-2023 Ramon Santamaria (@raysan5)
+*   License:
+*   This software is provided 'as-is', without any express or implied warranty. In no event 
+*   will the authors be held liable for any damages arising from the use of this software.
+*   
+*   Permission is granted to anyone to use this software for any purpose, including 
+*   commercial applications, and to alter it and redistribute it freely, subject to the 
+*   following restrictions:
+*   
+*   1. The origin of this software must not be misrepresented; you must not claim that you 
+*   wrote the original software. If you use this software in a product, an acknowledgment 
+*   in the product documentation would be appreciated but is not required.
+*   
+*   2. Altered source versions must be plainly marked as such, and must not be misrepresented 
+*   as being the original software.
+*   
+*   3. This notice may not be removed or altered from any source distribution.
 *
 ********************************************************************************************/
 
 #include "raylib.h"
+#include "raymath.h"
 
-#if defined(PLATFORM_WEB)
-    #include <emscripten/emscripten.h>
-#endif
+#include <stdbool.h>
 
-//----------------------------------------------------------------------------------
-// Local Variables Definition (local to this module)
-//----------------------------------------------------------------------------------
-Camera camera = { 0 };
-Vector3 cubePosition = { 0 };
+bool isTextureValid(const Texture2D *texture) {
+	return texture->id > 0;
+}
 
-//----------------------------------------------------------------------------------
-// Local Functions Declaration
-//----------------------------------------------------------------------------------
-static void UpdateDrawFrame(void);          // Update and draw one frame
-
-//----------------------------------------------------------------------------------
-// Main entry point
-//----------------------------------------------------------------------------------
-int main()
+int main(void)
 {
     // Initialization
     //--------------------------------------------------------------------------------------
     const int screenWidth = 800;
     const int screenHeight = 450;
+	
+	const int scarfySpeed = 5;
 
-    InitWindow(screenWidth, screenHeight, "raylib");
+    InitWindow(screenWidth, screenHeight, "RayLib - 2D Character Animation");
 
-    camera.position = (Vector3){ 10.0f, 10.0f, 8.0f };
-    camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };
-    camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };
-    camera.fovy = 60.0f;
-    camera.projection = CAMERA_PERSPECTIVE;
+	const char *filename = "scarfy.png";
+	Texture2D scarfy = LoadTexture(filename);
+	if(!isTextureValid(&scarfy)) {
+		
+		while (!WindowShouldClose()) {
+			BeginDrawing();
+				ClearBackground(RAYWHITE);
+				DrawText(TextFormat("ERROR: Couldn't load %s.", filename), 20, 20, 20, BLACK);
+			EndDrawing();
+		}
+		return 10;
+	}
+	
+	unsigned numFrames = 6;
+	int frameWidth = scarfy.width / numFrames;
+	Rectangle frameRec = { 0.0f, 0.0f, (float)frameWidth, (float)scarfy.height };
+	Vector2 scarfyPosition = {screenWidth / 2.0f, screenHeight / 2.0f};
+    Vector2 scarfyVelocity = {0.0f,0.0f};
+	
+	unsigned frameDelay = 5;
+	unsigned frameDelayCounter = 0;
+	unsigned frameIndex = 0;
 
-    //--------------------------------------------------------------------------------------
-
-#if defined(PLATFORM_WEB)
-    emscripten_set_main_loop(UpdateDrawFrame, 60, 1);
-#else
-    SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
+    SetTargetFPS(60);
     //--------------------------------------------------------------------------------------
 
     // Main game loop
     while (!WindowShouldClose())    // Detect window close button or ESC key
     {
-        UpdateDrawFrame();
+		// Update
+		if (IsKeyDown(KEY_RIGHT) || IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_RIGHT)) {
+			scarfyVelocity.x = scarfySpeed;
+			if(frameRec.width < 0) {
+				frameRec.width = -frameRec.width;
+			}
+        } else if (IsKeyDown(KEY_LEFT) || IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_LEFT)) {
+			scarfyVelocity.x = -scarfySpeed;
+			if(frameRec.width > 0) {
+				frameRec.width = -frameRec.width;
+			}
+		} else {
+			scarfyVelocity.x = 0;
+		}
+		bool scarfyMoving = scarfyVelocity.x != 0.0f || scarfyVelocity.y != 0.0f;
+        //----------------------------------------------------------------------------------
+		scarfyPosition = Vector2Add(scarfyPosition, scarfyVelocity);
+		
+		++frameDelayCounter;
+		if(frameDelayCounter > frameDelay) {
+			frameDelayCounter = 0;
+			
+			if(scarfyMoving) {
+				++frameIndex;
+				frameIndex %= numFrames;
+				frameRec.x = (float) frameWidth * frameIndex;
+			}
+		}
+        //----------------------------------------------------------------------------------
+
+        // Draw
+        //----------------------------------------------------------------------------------
+        BeginDrawing();
+
+            ClearBackground(RAYWHITE);
+			
+			DrawTextureRec(scarfy, frameRec, scarfyPosition, WHITE);
+            
+
+        EndDrawing();
+        //----------------------------------------------------------------------------------
     }
-#endif
 
     // De-Initialization
     //--------------------------------------------------------------------------------------
-    CloseWindow();                  // Close window and OpenGL context
+
+    // TODO: Unload all loaded resources at this point
+
+    CloseWindow();        // Close window and OpenGL context
     //--------------------------------------------------------------------------------------
 
     return 0;
-}
-
-// Update and draw game frame
-static void UpdateDrawFrame(void)
-{
-    // Update
-    //----------------------------------------------------------------------------------
-    UpdateCamera(&camera, CAMERA_ORBITAL);
-    //----------------------------------------------------------------------------------
-
-    // Draw
-    //----------------------------------------------------------------------------------
-    BeginDrawing();
-
-        ClearBackground(RAYWHITE);
-
-        BeginMode3D(camera);
-
-            DrawCube(cubePosition, 2.0f, 2.0f, 2.0f, RED);
-            DrawCubeWires(cubePosition, 2.0f, 2.0f, 2.0f, MAROON);
-            DrawGrid(10, 1.0f);
-
-        EndMode3D();
-
-        DrawText("This is a raylib example", 10, 40, 20, DARKGRAY);
-
-        DrawFPS(10, 10);
-
-    EndDrawing();
-    //----------------------------------------------------------------------------------
 }
